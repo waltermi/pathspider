@@ -3,17 +3,17 @@ import argparse
 import sys
 import logging
 
+import pathspider.cmd.filter
 import pathspider.cmd.measure
 import pathspider.cmd.observe
 import pathspider.cmd.test
-import pathspider.cmd.wizard
 import pathspider.cmd.traceroute
 
 cmds = [
+    pathspider.cmd.filter,
     pathspider.cmd.measure,
     pathspider.cmd.observe,
     pathspider.cmd.test,
-    pathspider.cmd.wizard,
     pathspider.cmd.traceroute,
 ]
 

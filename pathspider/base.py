@@ -36,7 +36,10 @@ from datetime import datetime
 
 from pathspider.network import ipv4_address
 from pathspider.network import ipv6_address
-from wheel.signatures import assertTrue
+from pathspider.network import ipv4_address_public
+from pathspider.network import ipv6_address_public
+from pathspider.network import ipv4_asn
+from pathspider.network import ipv6_asn
 
 __version__ = "2.0.0.dev0"
 
@@ -137,8 +140,13 @@ class Spider:
         self.exception = None
 
         if libtrace_uri.startswith('int'):
+            # TODO: Refactor this
             self.source = (ipv4_address(self.libtrace_uri[4:]),
                            ipv6_address(self.libtrace_uri[4:]))
+            self.source_public = (ipv4_address_public(self.libtrace_uri[4:]),
+                                  ipv6_address_public(self.libtrace_uri[4:]))
+            self.source_asn = (ipv4_asn(self.libtrace_uri[4:]),
+                               ipv6_asn(self.libtrace_uri[4:]))
         else:
             self.source = ("127.0.0.1", "::1")
 
@@ -413,7 +421,13 @@ class Spider:
             job = self.jobtab.pop(flow['jobId'])
             job['flow_results'] = flows
             job['time'] = {'from': start, 'to': stop}
+            job['missed_flows'] = 0
+            for flow in flows:
+                if flow['observed']:
+                    job['missed_flows'] = job['missed_flows'] + 1
             job['conditions'] = self.combine_flows(flows)
+            if job['missed_flows'] > 0:
+                job['conditions'].append("pathspider.missed_flows")
             if job['conditions'] is None:
                 job.pop('conditions')
             if self.args.trace:
@@ -680,7 +694,23 @@ class Spider:
 
         if self.stopping:
             return
-        
+
+        if not self.server_mode:
+            sourceindex = 1 if ':' in job['dip'] else 0
+            job['sip'] = self.source[sourceindex]
+            job['path'] = [job['sip']]
+            job['sip_public'] = self.source_public[sourceindex]
+            if not ( job['sip'] == job['sip_public'] ):
+                job['path'].append(job['sip_public'])
+            job['sip_asn'] = self.source_asn[sourceindex]
+            job['path'].append("AS" + str(job['sip_asn']))
+            if 'dip_asn' in job.keys():
+                job['path'].append("AS" + job['dip_asn'])
+            elif 'info' in job.keys():
+                if 'ASN' in job['info'].keys():
+                    job['path'].append("AS" + str(job['info']['ASN']))
+            job['path'].append(job['dip'])
+
         self.jobqueue.put(job)
 
 class PluggableSpider:
